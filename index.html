@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<!-- SEO -->
+<meta name="description" content="輔仁學分計算工具，貼上成績單即可自動計算已通過總學分">
+<meta name="keywords" content="學分計算,畢業學分計算,輔仁大學學分計算器">
+<meta name="robots" content="index, follow">
+<meta name="language" content="zh-TW">
+
+<!-- Open Graph -->
+<meta property="og:title" content="UniPass 學分計算器">
+<meta property="og:description" content="貼上成績單即可自動計算已通過總學分">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://unimopass.github.io/creditcalculator/">
+
+<title>UnimoPass 已通過總學分計算器</title>
+
+<style>
+:root{
+  --primary:#12398d;
+  --success:#059669;
+}
+body{
+  font-family:"PingFang TC","Microsoft JhengHei",sans-serif;
+  background:#f1f5f9;
+  margin:0;
+  padding:20px;
+  display:flex;
+  justify-content:center;
+}
+.app-container{
+  width:100%;
+  max-width:900px;
+  background:#fff;
+  padding:40px;
+  border-radius:16px;
+  box-shadow:0 10px 25px rgba(0,0,0,.05);
+}
+header{text-align:center;margin-bottom:30px;}
+h1{color:var(--primary);margin:0;font-size:28px;}
+
+.step-guide{
+  display:flex;
+  justify-content:space-around;
+  margin-bottom:25px;
+  background:#eff6ff;
+  padding:15px;
+  border-radius:10px;
+  font-size:14px;
+  color:#1e40af;
+  gap:10px;
+}
+
+textarea{
+  width:100%;
+  height:200px;
+  padding:15px;
+  border:2px solid #e2e8f0;
+  border-radius:12px;
+  font-size:14px;
+}
+textarea:focus{border-color:var(--primary);outline:none;}
+
+.btn-main{
+  width:100%;
+  background:var(--primary);
+  color:#fff;
+  border:none;
+  padding:18px;
+  font-size:18px;
+  font-weight:bold;
+  border-radius:12px;
+  cursor:pointer;
+  margin-top:15px;
+}
+.btn-main:active{transform:scale(.98);}
+
+#resultArea{display:none;margin-top:40px;animation:fadeIn .5s;}
+@keyframes fadeIn{from{opacity:0;transform:translateY(10px);}to{opacity:1;}}
+
+.score-board{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(140px,1fr));
+  gap:15px;
+  margin-bottom:30px;
+}
+
+.stat-card{
+  background:#f8fafc;
+  padding:20px;
+  border-radius:12px;
+  text-align:center;
+  border-bottom:4px solid #cbd5e1;
+}
+
+.stat-label{font-size:13px;color:#64748b;margin-bottom:10px;}
+.stat-value{font-size:24px;font-weight:800;color:#1e293b;}
+
+/* 分類按鈕互動 */
+.filter-btn{cursor:pointer;transition:.2s;}
+.filter-btn:hover{transform:translateY(-2px);background:#eef2ff;}
+.filter-btn.active{border-bottom-color:var(--primary);background:#e0e7ff;}
+
+.table-container{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;margin-top:10px;}
+th{background:#f8fafc;text-align:left;padding:12px;font-size:14px;color:#64748b;}
+td{padding:12px;border-bottom:1px solid #f1f5f9;font-size:14px;}
+
+.tag{padding:4px 8px;border-radius:6px;font-size:12px;font-weight:bold;}
+.tag-pass{background:#dcfce7;color:#166534;}
+.tag-fail{background:#fee2e2;color:#991b1b;}
+
+.divider{border:none;border-top:1px solid #e5e7eb;margin:40px 0 20px;}
+
+.site-footer{
+  display:flex;
+  justify-content:center;
+  font-size:12px;
+  color:#6b7280;
+  line-height:1.7;
+}
+
+@media(max-width:768px){
+  .app-container{padding:20px;}
+  .step-guide{flex-direction:column;}
+  textarea{height:140px;}
+}
+</style>
+</head>
+
+<body>
+<div class="app-container">
+  <header><h1>🎓 輔仁已通過總學分計算器</h1></header>
+
+  <div class="step-guide">
+    <span>❶ 輔仁學生資訊平台成績查詢頁 Ctrl+A → Ctrl+C</span>
+    <span>❷ 貼到下方文字框 Ctrl+V</span>
+    <span>❸ 點擊計算</span>
+  </div>
+
+  <textarea id="inputData" placeholder="僅適用輔仁資訊平台成績查詢格式；此計算器並無學年制計分規則，會將所有及格、抵免學分納入計算．．．"></textarea>
+  <button class="btn-main" onclick="processData()">立即計算學分</button>
+
+  <div id="resultArea">
+    <div class="score-board" id="filterBar">
+      <div class="stat-card filter-btn active" data-filter="全部">
+        <div class="stat-label">全部總結</div>
+        <div class="stat-value" id="val-total">0</div>
+      </div>
+      <div class="stat-card filter-btn" data-filter="必修">
+        <div class="stat-label">必/輔/雙修</div>
+        <div class="stat-value" id="val-必修">0</div>
+      </div>
+      <div class="stat-card filter-btn" data-filter="選修">
+        <div class="stat-label">選修</div>
+        <div class="stat-value" id="val-選修">0</div>
+      </div>
+      <div class="stat-card filter-btn" data-filter="通識">
+        <div class="stat-label">通識</div>
+        <div class="stat-value" id="val-通識">0</div>
+      </div>
+      <div class="stat-card filter-btn" data-filter="學年課">
+        <div class="stat-label">檢視</div>
+        <div class="stat-value" style="font-size:16px;">學年課</div>
+      </div>
+    </div>
+
+    <div class="table-container">
+      <h3>科目解析清單（已排除操行）</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>科目名稱</th>
+            <th>類別</th>
+            <th>性質</th>
+            <th>學分</th>
+            <th>成績</th>
+            <th>計算結果</th>
+          </tr>
+        </thead>
+        <tbody id="listBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+<body>
+  <main>
+    <!-- 主內容 -->
+  </main>
+
+  <footer>
+    <br>
+    <footer style="display:flex; justify-content:center;">
+  <div style="
+    max-width:520px;
+    width:100%;
+    box-sizing:border-box;
+    text-align:center;
+    color:#666;
+    font-size:12px;
+  ">
+    本工具僅供學生自我檢視參考，非校方官方系統<br>
+    實際畢業資格以教務處審核為準！<a href="https://learningcounseling.fju.edu.tw/student" target="_blank" style="color: #12398d; text-decoration: underline;">校方畢業學分採認檢核</a>
+ <br>
+    <br>
+
+  🔒 所有計算皆於瀏覽器端執行，不會傳送或儲存任何成績資料<br>
+
+
+    <div style="color:#bbb; font-size:11px;">
+      © 2026 Unimopass | Local processing only
+    </div>
+    <div class="privacy-hint"></div>
+      </div>
+  </footer>
+</body>
+</div>
+
+<script>
+function parseScore(s){
+  if(s === "通過" || s === "及格" || s === "抵免") return 60;
+  const n = parseInt(s);
+  return isNaN(n) ? 0 : n;
+}
+
+function processData(){
+  const rawText = document.getElementById('inputData').value;
+  if(!rawText.trim()){alert("請先貼上內容");return;}
+
+  const tokens = rawText.split(/\s+/).filter(t=>t);
+  const allRecords = [];
+  const stats = {"必修":0, "選修":0, "通識":0, "輔修":0, "雙主修":0, "輔助":0};
+
+  // 1. 解析原始資料
+  for(let i=0; i<tokens.length; i++){
+    if(tokens[i].includes("教務處") || tokens[i].includes("尚未上傳") || tokens[i].includes("尚未登打")){
+      // 排除操行
+      let isConduct=false;
+      for(let k=i-1; k>=Math.max(0,i-8); k--){ if(tokens[k]==="操行") isConduct=true; }
+      if(isConduct) continue;
+
+      let scoreText = tokens[i-1];
+      let type="未知", credit=0, courseName="未知", period="0";
+
+      // 搜尋類別與學分
+      for(let j=i-1; j>=Math.max(0,i-15); j--){
+        // 包含 必修、選修、通識、輔修、雙主修
+        if(["必修","選修","通識","輔修","雙主修","雙主修修"].includes(tokens[j])){
+          type = tokens[j].replace("雙主修修", "雙主修"); // 修正原始資料可能出現的贅字
+          courseName = tokens[j+1];
+          // 往後找數字即為學分
+          for(let m=j+1; m<i-1; m++){
+            if(/^\d+(\.\d+)?$/.test(tokens[m])){ credit=parseFloat(tokens[m]); break; }
+          }
+          break;
+        }
+      }
+      
+      // 辨識學期性質
+      for(let p=i-1; p>=Math.max(0,i-12); p--){
+        if(tokens[p].includes("1(學年)")) { period="1"; break; }
+        if(tokens[p].includes("2(學年)")) { period="2"; break; }
+        if(tokens[p].includes("0(學期)")) { period="0"; break; }
+      }
+
+      if(type !== "未知") {
+        allRecords.push({ courseName, type, period, credit, scoreText });
+      }
+    }
+  }
+
+  // 2. 排序邏輯：讓同名的學年課（上）（下）排在一起
+  allRecords.sort((a, b) => {
+    if(a.courseName === b.courseName) return a.period - b.period;
+    return a.courseName.localeCompare(b.courseName, 'zh-Hant');
+  });
+
+  // 3. 渲染表格與計算
+  let tableHtml = "";
+  allRecords.forEach(r => {
+    const isPassed = r.scoreText === "抵免" || parseScore(r.scoreText) >= 60;
+    
+    // 計算學分：不再連動，只要這科過就加分
+    if(isPassed) {
+      stats[r.type] = (stats[r.type] || 0) + r.credit;
+    }
+
+    let periodName = r.period === "0" ? "學期" : (r.period === "1" ? "學年(上)" : "學年(下)");
+    
+    tableHtml += `
+      <tr data-type="${r.type}" data-is-year="${r.period !== '0'}">
+        <td>${r.courseName}</td>
+        <td>${r.type}</td>
+        <td>${periodName}</td>
+        <td>${r.credit}</td>
+        <td>${r.scoreText}</td>
+        <td><span class="tag ${isPassed ? 'tag-pass' : 'tag-fail'}">${isPassed ? '納入計算' : '不計學分'}</span></td>
+      </tr>`;
+  });
+
+  // 4. UI 整合更新 (必修 = 必修 + 輔修 + 雙主修)
+  const combinedMajor = (stats["必修"]||0) + (stats["輔修"]||0) + (stats["雙主修"]||0);
+  const totalCredits = combinedMajor + (stats["選修"]||0) + (stats["通識"]||0);
+
+  document.getElementById('val-必修').innerText = combinedMajor;
+  document.getElementById('val-選修').innerText = stats["選修"] || 0;
+  document.getElementById('val-通識').innerText = stats["通識"] || 0;
+  document.getElementById('val-total').innerText = totalCredits;
+  
+  document.getElementById('listBody').innerHTML = tableHtml;
+  document.getElementById('resultArea').style.display = 'block';
+}
+
+// 篩選邏輯
+document.addEventListener("click", e => {
+  const btn = e.target.closest(".filter-btn");
+  if(!btn) return;
+  
+  const filter = btn.dataset.filter;
+  document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+  
+  document.querySelectorAll("#listBody tr").forEach(row => {
+    const type = row.dataset.type;
+    const isYear = row.dataset.isYear === "true";
+    
+    if(filter === "全部") {
+      row.style.display = "";
+    } else if (filter === "必修") {
+      // 點擊「必修」顯示 必修、輔修、雙主修
+      row.style.display = (["必修","輔修","雙主修"].includes(type)) ? "" : "none";
+    } else if (filter === "學年課") {
+      // 僅顯示學年性質的科目
+      row.style.display = isYear ? "" : "none";
+    } else {
+      row.style.display = (type === filter) ? "" : "none";
+    }
+  });
+});
+</script>
+</body>
+</html>
